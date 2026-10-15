@@ -113,6 +113,7 @@ const AppContent = () => {
 
   // Enterprise Methodology State
   const [showEnterpriseMethodology, setShowEnterpriseMethodology] = useState(false);
+  const [enterpriseMethodologyInitialView, setEnterpriseMethodologyInitialView] = useState<'methodology' | 'ai_ecosystem'>('methodology');
 
   // Glossary State
   const [showGlossary, setShowGlossary] = useState(false);
@@ -955,6 +956,7 @@ const AppContent = () => {
           onClose={() => setShowEnterpriseMethodology(false)}
           onSelectArchitecture={(id) => setSelectedArchId(id)}
           onOpenSolidGuide={() => setShowSolidGuide(true)}
+          initialViewMode={enterpriseMethodologyInitialView}
         />
       )}
 
@@ -1043,6 +1045,11 @@ const AppContent = () => {
         <FdeRoadmapModal
           onClose={() => setShowFdeAcademy(false)}
           onSelectArchitecture={(id) => setSelectedArchId(id)}
+          onOpenEnterpriseMethodology={() => {
+            setEnterpriseMethodologyInitialView('ai_ecosystem');
+            setShowFdeAcademy(false);
+            setShowEnterpriseMethodology(true);
+          }}
         />
       )}
 

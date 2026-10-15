@@ -66,7 +66,8 @@ export interface FdeStudyResource {
 export type {
   FdeCaseStudy,
   FdeImplementationStep,
-  FdeAiTool
+  FdeAiTool,
+  FdeAiToolMaster
 } from './fdeCaseStudiesData';
 
 export interface FdeQuizQuestion {
@@ -1065,7 +1066,7 @@ When a critical production failure strikes an enterprise customer, everyone is w
   }
 ];
 
-export { FDE_CASE_STUDIES } from './fdeCaseStudiesData';
+export { FDE_CASE_STUDIES, FDE_AI_TOOLS_ENCYCLOPEDIA } from './fdeCaseStudiesData';
 
 export const FDE_CERTIFICATION_EXAM: FdeQuizQuestion[] = [
   {

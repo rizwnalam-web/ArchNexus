@@ -3,21 +3,29 @@ import {
   METHODOLOGY_STEPS,
   ENTERPRISE_DOMAIN_PRESETS,
   MethodologyStep,
-  EnterpriseDomainPreset
+  EnterpriseDomainPreset,
+  FDE_ECOSYSTEM_TOOLS
 } from '../data/enterpriseMethodologyData';
 import { ArchType } from '../types';
+import { AiToolingEcosystemVisualMap } from './AiToolingEcosystemVisualMap';
 
 interface EnterpriseMethodologyViewProps {
   onClose: () => void;
   onSelectArchitecture?: (archId: ArchType) => void;
   onOpenSolidGuide?: () => void;
+  initialViewMode?: 'methodology' | 'ai_ecosystem';
+  initialEcosystemStageId?: string;
 }
 
 export const EnterpriseMethodologyView: React.FC<EnterpriseMethodologyViewProps> = ({
   onClose,
   onSelectArchitecture,
-  onOpenSolidGuide
+  onOpenSolidGuide,
+  initialViewMode = 'methodology',
+  initialEcosystemStageId = 'all'
 }) => {
+  const [viewMode, setViewMode] = useState<'methodology' | 'ai_ecosystem'>(initialViewMode);
+  const [ecosystemStageId, setEcosystemStageId] = useState<string>(initialEcosystemStageId);
   const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
   const [selectedDomainPresetId, setSelectedDomainPresetId] = useState<string>('supply-chain');
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
@@ -183,56 +191,101 @@ ${step.architecturalChecklist.map(c => `- [ ] ${c}`).join('\n')}
           </div>
         </div>
 
-        {/* Domain Blueprint Selector Banner */}
-        <div className="bg-zinc-950 border-b border-zinc-800 p-3 sm:p-4 shrink-0 space-y-2">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-              <span>🎯 Enterprise Domain Preset:</span>
-            </span>
-            <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
-              {ENTERPRISE_DOMAIN_PRESETS.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedDomainPresetId(p.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-                    selectedDomainPresetId === p.id
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
-                      : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200'
-                  }`}
-                >
-                  {p.name}
-                </button>
-              ))}
-            </div>
+        {/* View Mode Switcher: 6-Phase Blueprint vs AI Tooling Ecosystem Visual Map */}
+        <div className="bg-zinc-950 border-b border-zinc-800 px-4 py-2.5 flex items-center justify-between gap-3 shrink-0 flex-wrap">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setViewMode('methodology')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+                viewMode === 'methodology'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
+                  : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700'
+              }`}
+            >
+              <span>📋 6-Phase Engineering Methodology</span>
+            </button>
+            <button
+              onClick={() => setViewMode('ai_ecosystem')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+                viewMode === 'ai_ecosystem'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-900/30'
+                  : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700'
+              }`}
+            >
+              <span>🗺️ AI Tooling Ecosystem Visual Map</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-950 text-purple-300 font-mono border border-purple-800">
+                8 STAGES • {FDE_ECOSYSTEM_TOOLS.length} TOOLS
+              </span>
+            </button>
           </div>
 
-          {/* Selected Preset Summary */}
-          <div className="bg-zinc-900/80 p-2.5 rounded-xl border border-zinc-800/80 text-xs grid grid-cols-1 md:grid-cols-3 gap-2">
-            <div>
-              <span className="text-zinc-500 block font-semibold text-[10px] uppercase">Industry & Scale:</span>
-              <span className="text-zinc-200 font-medium">{selectedPreset.industry} — {selectedPreset.scaleMetric}</span>
-            </div>
-            <div>
-              <span className="text-zinc-500 block font-semibold text-[10px] uppercase">Primary Architectural Constraint:</span>
-              <span className="text-amber-300 font-medium">{selectedPreset.keyConstraint}</span>
-            </div>
-            <div>
-              <span className="text-zinc-500 block font-semibold text-[10px] uppercase">Recommended Architecture Stack:</span>
-              <span className="text-blue-300 font-medium">{selectedPreset.recommendedArchStyle}</span>
-            </div>
+          <div className="text-xs text-zinc-400 font-mono hidden sm:block">
+            {viewMode === 'methodology' ? 'TOGAF & C4 Architecture Lifecycle' : 'FDE Tooling & Production Automation Topology'}
           </div>
         </div>
 
-        {/* 6-Phase Interactive Stepper Bar */}
-        <div className="bg-zinc-950 border-b border-zinc-800 p-2 overflow-x-auto flex items-center justify-between gap-1 shrink-0 scrollbar-thin">
-          {METHODOLOGY_STEPS.map((step, idx) => {
-            const isCurrent = activeStepIndex === idx;
-            const isCompleted = activeStepIndex > idx;
+        {viewMode === 'ai_ecosystem' ? (
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+            <AiToolingEcosystemVisualMap
+              onNavigateToMethodologyPhase={(phaseNumber) => {
+                setActiveStepIndex(Math.max(0, Math.min(METHODOLOGY_STEPS.length - 1, phaseNumber - 1)));
+                setViewMode('methodology');
+              }}
+              initialStageId={ecosystemStageId}
+            />
+          </div>
+        ) : (
+          <>
+            {/* Domain Blueprint Selector Banner */}
+            <div className="bg-zinc-950 border-b border-zinc-800 p-3 sm:p-4 shrink-0 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                  <span>🎯 Enterprise Domain Preset:</span>
+                </span>
+                <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
+                  {ENTERPRISE_DOMAIN_PRESETS.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => setSelectedDomainPresetId(p.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                        selectedDomainPresetId === p.id
+                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
+                          : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-            return (
-              <button
-                key={step.stepNumber}
-                onClick={() => setActiveStepIndex(idx)}
+              {/* Selected Preset Summary */}
+              <div className="bg-zinc-900/80 p-2.5 rounded-xl border border-zinc-800/80 text-xs grid grid-cols-1 md:grid-cols-3 gap-2">
+                <div>
+                  <span className="text-zinc-500 block font-semibold text-[10px] uppercase">Industry & Scale:</span>
+                  <span className="text-zinc-200 font-medium">{selectedPreset.industry} — {selectedPreset.scaleMetric}</span>
+                </div>
+                <div>
+                  <span className="text-zinc-500 block font-semibold text-[10px] uppercase">Primary Architectural Constraint:</span>
+                  <span className="text-amber-300 font-medium">{selectedPreset.keyConstraint}</span>
+                </div>
+                <div>
+                  <span className="text-zinc-500 block font-semibold text-[10px] uppercase">Recommended Architecture Stack:</span>
+                  <span className="text-blue-300 font-medium">{selectedPreset.recommendedArchStyle}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 6-Phase Interactive Stepper Bar */}
+            <div className="bg-zinc-950 border-b border-zinc-800 p-2 overflow-x-auto flex items-center justify-between gap-1 shrink-0 scrollbar-thin">
+              {METHODOLOGY_STEPS.map((step, idx) => {
+                const isCurrent = activeStepIndex === idx;
+                const isCompleted = activeStepIndex > idx;
+
+                return (
+                  <button
+                    key={step.stepNumber}
+                    onClick={() => setActiveStepIndex(idx)}
                 className={`flex-1 min-w-[130px] py-2 px-2.5 rounded-xl text-left transition-all flex flex-col justify-between border ${
                   isCurrent
                     ? 'bg-blue-600/20 border-blue-500 text-white ring-1 ring-blue-500/50 shadow-md'
@@ -397,6 +450,68 @@ ${step.architecturalChecklist.map(c => `- [ ] ${c}`).join('\n')}
 
           </div>
 
+          {/* Phase-Specific AI Tooling Ecosystem Card */}
+          {FDE_ECOSYSTEM_TOOLS.some(t => t.methodologyPhaseNumber === currentStep.stepNumber) && (
+            <div className="bg-gradient-to-r from-purple-950/40 via-indigo-950/20 to-zinc-950 border border-purple-800/40 p-4 sm:p-5 rounded-2xl space-y-3 shadow-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-900/40 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl p-1.5 bg-purple-950 border border-purple-800 rounded-lg">🤖</span>
+                  <div>
+                    <h4 className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>Phase {currentStep.stepNumber} AI Tooling & Operational Automation:</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-900/60 text-purple-200 border border-purple-700">
+                        {FDE_ECOSYSTEM_TOOLS.filter(t => t.methodologyPhaseNumber === currentStep.stepNumber).length} AI Engines Mapped
+                      </span>
+                    </h4>
+                    <span className="text-[11px] text-zinc-400">
+                      Frontier AI tools configured for this lifecycle phase
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setViewMode('ai_ecosystem');
+                  }}
+                  className="text-xs text-purple-300 hover:text-white font-bold flex items-center gap-1.5 px-3 py-1.5 bg-purple-950/80 hover:bg-purple-900 rounded-lg border border-purple-700 transition-all shadow shrink-0"
+                >
+                  <span>Open Full AI Tooling Ecosystem Map</span>
+                  <span>→</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                {FDE_ECOSYSTEM_TOOLS.filter(t => t.methodologyPhaseNumber === currentStep.stepNumber).map(tool => (
+                  <div key={tool.id} className="p-3.5 bg-zinc-900/90 border border-zinc-800/80 rounded-xl space-y-2.5 flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-white text-xs">{tool.name}</span>
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${tool.badgeColor}`}>
+                          {tool.category}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-emerald-300/95 leading-relaxed">
+                        <span className="font-bold text-emerald-400">FDE Responsibility: </span>
+                        {tool.fdeResponsibility}
+                      </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between text-[10px]">
+                      <span className="text-indigo-300 font-medium">⚡ {tool.roiOrVelocityImpact}</span>
+                      <button
+                        onClick={() => {
+                          setViewMode('ai_ecosystem');
+                        }}
+                        className="text-blue-400 hover:text-blue-300 font-semibold"
+                      >
+                        Inspect CLI & Guardrails →
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Architectural Code & Spec Window */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -462,19 +577,38 @@ ${step.architecturalChecklist.map(c => `- [ ] ${c}`).join('\n')}
           </div>
 
         </div>
+        </>
+      )}
 
         {/* Footer */}
         <div className="p-4 border-t border-zinc-800 bg-zinc-900/90 flex justify-between items-center shrink-0">
           <div className="text-xs text-zinc-400 hidden sm:block">
-            Phase <span className="text-white font-bold">{currentStep.stepNumber}</span> of <span className="text-white font-bold">6</span>
+            {viewMode === 'methodology' ? (
+              <>
+                Phase <span className="text-white font-bold">{currentStep.stepNumber}</span> of <span className="text-white font-bold">6</span>
+              </>
+            ) : (
+              <>
+                <span className="text-purple-400 font-bold">AI Tooling Ecosystem Map</span> • <span className="text-white font-bold">8 Lifecycle Stages</span> • <span className="text-emerald-400 font-bold">{FDE_ECOSYSTEM_TOOLS.length} AI Engines</span>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            <button
-              onClick={handleDownloadBlueprint}
-              className="py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-blue-300 text-xs font-bold rounded-xl transition-colors flex items-center gap-1"
-            >
-              <span>📥 Export Blueprint</span>
-            </button>
+            {viewMode === 'methodology' ? (
+              <button
+                onClick={handleDownloadBlueprint}
+                className="py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-blue-300 text-xs font-bold rounded-xl transition-colors flex items-center gap-1"
+              >
+                <span>📥 Export Blueprint</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setViewMode('methodology')}
+                className="py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-indigo-300 text-xs font-bold rounded-xl transition-colors flex items-center gap-1"
+              >
+                <span>← 6-Phase Blueprint</span>
+              </button>
+            )}
             {onSelectArchitecture && (
               <button
                 onClick={() => {

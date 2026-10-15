@@ -52,6 +52,8 @@ import {
   FdeCaseStudy,
   FdeImplementationStep,
   FdeAiTool,
+  FdeAiToolMaster,
+  FDE_AI_TOOLS_ENCYCLOPEDIA,
   FdeQuizQuestion,
   FdeFlashcard
 } from '../data/fdeData';
@@ -60,11 +62,16 @@ import { ArchType } from '../types';
 interface FdeRoadmapModalProps {
   onClose: () => void;
   onSelectArchitecture?: (archId: ArchType) => void;
+  onOpenEnterpriseMethodology?: () => void;
 }
 
 type TabType = 'roadmap' | 'study' | 'cases' | 'tools' | 'exam' | 'certificate';
 
-export const FdeRoadmapModal: React.FC<FdeRoadmapModalProps> = ({ onClose, onSelectArchitecture }) => {
+export const FdeRoadmapModal: React.FC<FdeRoadmapModalProps> = ({
+  onClose,
+  onSelectArchitecture,
+  onOpenEnterpriseMethodology
+}) => {
   const [activeTab, setActiveTab] = useState<TabType>('roadmap');
   const [selectedPhaseId, setSelectedPhaseId] = useState<number>(1);
   const [searchQuery, setSearchQuery] = useState('');
@@ -118,8 +125,11 @@ export const FdeRoadmapModal: React.FC<FdeRoadmapModalProps> = ({ onClose, onSel
   }, [selectedStudyCategory, searchQuery]);
 
   // Enterprise Case Studies State
+  const [casesSubView, setCasesSubView] = useState<'cases' | 'encyclopedia'>('cases');
   const [caseStudyIndustryFilter, setCaseStudyIndustryFilter] = useState<string>('ALL');
   const [caseStudySearchQuery, setCaseStudySearchQuery] = useState<string>('');
+  const [encyclopediaCategoryFilter, setEncyclopediaCategoryFilter] = useState<string>('ALL');
+  const [encyclopediaSearchQuery, setEncyclopediaSearchQuery] = useState<string>('');
   const [caseStudyActiveView, setCaseStudyActiveView] = useState<Record<string, 'implementation' | 'playbook'>>({});
   const [caseStudyActiveStep, setCaseStudyActiveStep] = useState<Record<string, number>>({});
   const [copiedSowId, setCopiedSowId] = useState<string | null>(null);
@@ -165,12 +175,34 @@ export const FdeRoadmapModal: React.FC<FdeRoadmapModalProps> = ({ onClose, onSel
       const inSteps = Boolean(cs.implementationSteps?.some(step =>
         step.title.toLowerCase().includes(q) ||
         step.summary.toLowerCase().includes(q) ||
-        step.aiToolsUsed.some(t => t.toolName.toLowerCase().includes(q) || t.purpose.toLowerCase().includes(q))
+        step.aiToolsUsed.some(t =>
+          t.toolName.toLowerCase().includes(q) ||
+          t.purpose.toLowerCase().includes(q) ||
+          (t.definition && t.definition.toLowerCase().includes(q)) ||
+          (t.responsibility && t.responsibility.toLowerCase().includes(q))
+        )
       ));
 
       return matchesIndustry && (inTitle || inCompany || inSituation || inIndustry || inAiStack || inSteps);
     });
   }, [caseStudyIndustryFilter, caseStudySearchQuery]);
+
+  const filteredEncyclopediaTools = useMemo(() => {
+    return FDE_AI_TOOLS_ENCYCLOPEDIA.filter(t => {
+      const matchesCat = encyclopediaCategoryFilter === 'ALL' || t.category === encyclopediaCategoryFilter;
+      const q = encyclopediaSearchQuery.toLowerCase().trim();
+      if (!q) return matchesCat;
+
+      const inName = t.name.toLowerCase().includes(q);
+      const inDef = t.definition.toLowerCase().includes(q);
+      const inResp = t.coreResponsibilities.some(r => r.toLowerCase().includes(q));
+      const inUses = t.primaryUseCases.some(u => u.toLowerCase().includes(q));
+      const inArch = t.keyArchitecture.toLowerCase().includes(q);
+      const inCases = t.deployedInCaseStudies.some(c => c.toLowerCase().includes(q));
+
+      return matchesCat && (inName || inDef || inResp || inUses || inArch || inCases);
+    });
+  }, [encyclopediaCategoryFilter, encyclopediaSearchQuery]);
 
   const handleExportCaseStudyMarkdown = (cs: FdeCaseStudy) => {
     const md = `# ${cs.title}
@@ -207,8 +239,12 @@ ${cs.implementationSteps.map(step => `
 ### Step ${step.stepNumber}: ${step.title} (${step.phase})
 ${step.summary}
 
-#### AI Tools & Technologies Used:
-${step.aiToolsUsed.map(t => `- **${t.toolName}** (${t.category}): ${t.purpose}${t.commandOrSetup ? ` | \`${t.commandOrSetup}\`` : ''}`).join('\n')}
+#### AI Tools, Definitions & FDE Production Responsibilities:
+${step.aiToolsUsed.map(t => `- **${t.toolName}** [${t.category}]
+  - **Objective / Purpose:** ${t.purpose}
+  - **AI Tool Definition:** ${t.definition}
+  - **FDE Production Responsibility:** ${t.responsibility}
+  ${t.commandOrSetup ? `- **Setup / CLI Command:** \`${t.commandOrSetup}\`` : ''}`).join('\n')}
 
 #### Implementation Artifact (${step.implementationSnippet.filename}):
 \`\`\`${step.implementationSnippet.language}
@@ -936,8 +972,52 @@ ${step.promptOrCliSample ? `#### Execution CLI / Prompt:\n\`\`\`bash\n${step.pro
         {/* Tab 3: ENTERPRISE CASE STUDIES */}
         {activeTab === 'cases' && (
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar bg-zinc-900/30">
-            {/* Header & Overview */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-zinc-900/80 p-5 rounded-2xl border border-zinc-800">
+            {/* View Mode Toggle: Case Studies vs AI Tools Directory */}
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3 gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCasesSubView('cases')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+                    casesSubView === 'cases'
+                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-900/30'
+                      : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700'
+                  }`}
+                >
+                  <Briefcase className="w-3.5 h-3.5" />
+                  <span>Enterprise Case Studies & Step Blueprints ({FDE_CASE_STUDIES.length})</span>
+                </button>
+
+                <button
+                  onClick={() => setCasesSubView('encyclopedia')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+                    casesSubView === 'encyclopedia'
+                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-900/30'
+                      : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700'
+                  }`}
+                >
+                  <BrainCircuit className="w-3.5 h-3.5 text-purple-300" />
+                  <span>AI Tools Directory & Enterprise Responsibility Matrix ({FDE_AI_TOOLS_ENCYCLOPEDIA.length})</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-950 text-purple-300 font-mono border border-purple-800">
+                    MASTER DIRECTORY
+                  </span>
+                </button>
+              </div>
+
+              {casesSubView === 'cases' ? (
+                <div className="text-xs text-zinc-400 font-mono">
+                  {filteredCaseStudies.length} of {FDE_CASE_STUDIES.length} Case Studies Active
+                </div>
+              ) : (
+                <div className="text-xs text-zinc-400 font-mono">
+                  {filteredEncyclopediaTools.length} of {FDE_AI_TOOLS_ENCYCLOPEDIA.length} Tools Cataloged
+                </div>
+              )}
+            </div>
+
+            {casesSubView === 'cases' ? (
+              <>
+                {/* Header & Overview */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-zinc-900/80 p-5 rounded-2xl border border-zinc-800">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <Briefcase className="w-5 h-5 text-purple-400" />
@@ -1107,13 +1187,26 @@ ${step.promptOrCliSample ? `#### Execution CLI / Prompt:\n\`\`\`bash\n${step.pro
                       {/* AI Toolchain Stack Overview Ribbon */}
                       {cs.aiStackSummary && (
                         <div className="p-3 bg-zinc-950/80 rounded-xl border border-zinc-800/80 space-y-2">
-                          <div className="flex items-center justify-between text-[11px] font-bold text-zinc-400">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold text-zinc-400">
                             <span className="flex items-center gap-1.5 text-purple-300">
                               <BrainCircuit className="w-3.5 h-3.5 text-purple-400" /> AI Toolchain & Infrastructure Stack:
                             </span>
-                            <span className="text-zinc-500 font-mono text-[10px]">
-                              {completedSteps.length} of {cs.implementationSteps.length} Steps Practiced
-                            </span>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  setCasesSubView('encyclopedia');
+                                  setEncyclopediaSearchQuery(cs.title.split(' ')[0]);
+                                }}
+                                className="text-[10px] font-medium text-purple-300 hover:text-white px-2 py-0.5 rounded bg-purple-950/60 hover:bg-purple-900 border border-purple-800/80 flex items-center gap-1 transition-all"
+                                title="Open AI Tools Encyclopedia filtered for this case study"
+                              >
+                                <BookOpen className="w-3 h-3 text-purple-400" />
+                                <span>Browse Tool Definitions & Responsibilities</span>
+                              </button>
+                              <span className="text-zinc-500 font-mono text-[10px]">
+                                {completedSteps.length} of {cs.implementationSteps.length} Steps Practiced
+                              </span>
+                            </div>
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
                             <div className="p-2 bg-zinc-900/60 rounded-lg border border-zinc-800/60">
@@ -1281,38 +1374,83 @@ ${step.promptOrCliSample ? `#### Execution CLI / Prompt:\n\`\`\`bash\n${step.pro
                               </div>
 
                               {/* AI Tools Used in this Step */}
-                              <div className="space-y-2">
-                                <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
-                                  <Bot className="w-4 h-4 text-purple-400" /> AI Tools & Technologies Used in this Step:
-                                </span>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                              <div className="space-y-2.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                                    <Bot className="w-4 h-4 text-purple-400" /> AI Tools, Definitions & Step Responsibilities:
+                                  </span>
+                                  <span className="text-[10px] text-zinc-400 font-mono">
+                                    {currentStep.aiToolsUsed.length} Tools Deployed
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-1 gap-3">
                                   {currentStep.aiToolsUsed.map((tool, idx) => (
-                                    <div key={idx} className="p-3 bg-zinc-900/90 rounded-xl border border-zinc-800 space-y-1.5">
-                                      <div className="flex items-center justify-between gap-1">
-                                        <span className="text-xs font-bold text-white">{tool.toolName}</span>
-                                        <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${
-                                          tool.category === 'LLM & Reasoning'
-                                            ? 'bg-purple-950 text-purple-300 border-purple-800'
-                                            : tool.category === 'Agent Framework'
-                                            ? 'bg-indigo-950 text-indigo-300 border-indigo-800'
-                                            : tool.category === 'Vector & Data'
-                                            ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
-                                            : tool.category === 'Computer Vision & Multimodal'
-                                            ? 'bg-amber-950 text-amber-300 border-amber-800'
-                                            : tool.category === 'Observability & Eval'
-                                            ? 'bg-rose-950 text-rose-300 border-rose-800'
-                                            : 'bg-emerald-950 text-emerald-300 border-emerald-800'
-                                        }`}>
-                                          {tool.category}
-                                        </span>
+                                    <div key={idx} className="p-3.5 bg-zinc-900/95 rounded-xl border border-zinc-800 space-y-2.5 hover:border-zinc-700 transition-all shadow-sm">
+                                      {/* Header */}
+                                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 pb-2">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs font-bold text-white tracking-tight">{tool.toolName}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${
+                                            tool.category === 'LLM & Reasoning'
+                                              ? 'bg-purple-950 text-purple-300 border-purple-800'
+                                              : tool.category === 'Agent Framework'
+                                              ? 'bg-indigo-950 text-indigo-300 border-indigo-800'
+                                              : tool.category === 'Vector & Data'
+                                              ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
+                                              : tool.category === 'Computer Vision & Multimodal'
+                                              ? 'bg-amber-950 text-amber-300 border-amber-800'
+                                              : tool.category === 'Observability & Eval'
+                                              ? 'bg-rose-950 text-rose-300 border-rose-800'
+                                              : 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                                          }`}>
+                                            {tool.category}
+                                          </span>
+                                        </div>
                                       </div>
-                                      <p className="text-xs text-zinc-300 leading-snug">{tool.purpose}</p>
+
+                                      {/* Objective / Purpose */}
+                                      <div className="text-xs text-zinc-300">
+                                        <span className="text-[10px] uppercase font-bold text-zinc-400 block mb-0.5">Objective:</span>
+                                        {tool.purpose}
+                                      </div>
+
+                                      {/* Grid: Definition & Responsibility */}
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-0.5">
+                                        {/* Definition Card */}
+                                        <div className="p-2.5 rounded-lg bg-purple-950/20 border border-purple-900/40 space-y-1">
+                                          <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold text-purple-300">
+                                            <BookOpen className="w-3 h-3 text-purple-400" />
+                                            <span>AI Tool Definition:</span>
+                                          </div>
+                                          <p className="text-xs text-purple-200/90 leading-relaxed font-normal">
+                                            {tool.definition}
+                                          </p>
+                                        </div>
+
+                                        {/* Responsibility Card */}
+                                        <div className="p-2.5 rounded-lg bg-emerald-950/20 border border-emerald-900/40 space-y-1">
+                                          <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold text-emerald-300">
+                                            <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                                            <span>FDE Production Responsibility:</span>
+                                          </div>
+                                          <p className="text-xs text-emerald-200/90 leading-relaxed font-normal">
+                                            {tool.responsibility}
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      {/* Setup Command */}
                                       {tool.commandOrSetup && (
-                                        <div className="flex items-center justify-between p-1.5 bg-black/60 rounded font-mono text-[10px] text-zinc-400 border border-zinc-800/80">
-                                          <code className="truncate mr-2">{tool.commandOrSetup}</code>
+                                        <div className="flex items-center justify-between p-1.5 bg-black/70 rounded font-mono text-[10px] text-zinc-400 border border-zinc-800/80">
+                                          <div className="flex items-center gap-1.5 overflow-hidden">
+                                            <span className="text-[9px] uppercase font-bold text-zinc-400 shrink-0">Setup:</span>
+                                            <code className="truncate text-zinc-300">{tool.commandOrSetup}</code>
+                                          </div>
                                           <button
                                             onClick={() => handleCopyCode(tool.commandOrSetup!, `${cs.id}-${currentStep.stepNumber}-tool-${idx}`)}
-                                            className="text-zinc-500 hover:text-white shrink-0"
+                                            className="text-zinc-500 hover:text-white shrink-0 p-1 rounded hover:bg-zinc-800"
                                             title="Copy command"
                                           >
                                             {copiedCodeId === `${cs.id}-${currentStep.stepNumber}-tool-${idx}` ? (
@@ -1512,6 +1650,222 @@ ${step.promptOrCliSample ? `#### Execution CLI / Prompt:\n\`\`\`bash\n${step.pro
                     </div>
                   );
                 })}
+              </div>
+            )}
+              </>
+            ) : (
+              /* ENCYCLOPEDIA & RESPONSIBILITY DIRECTORY */
+              <div className="space-y-6">
+                {/* Encyclopedia Header */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-zinc-900/80 p-5 rounded-2xl border border-zinc-800">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <BrainCircuit className="w-5 h-5 text-purple-400" />
+                      <h3 className="text-base font-bold text-white">
+                        AI Tools Definition & Production Responsibility Directory
+                      </h3>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800">
+                        {FDE_AI_TOOLS_ENCYCLOPEDIA.length} AI Frameworks & Foundation Models
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-400 max-w-3xl">
+                      Exhaustive architectural definitions, specific operational responsibilities, safety contracts, and CLI commands for every AI tool, agent framework, vector engine, and vision model deployed across our enterprise case studies.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+                    {onOpenEnterpriseMethodology && (
+                      <button
+                        onClick={onOpenEnterpriseMethodology}
+                        className="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 whitespace-nowrap"
+                        title="Open full AI Tooling Ecosystem & Lifecycle Visual Map in Enterprise Methodology"
+                      >
+                        <Workflow className="w-3.5 h-3.5" />
+                        <span>Lifecycle Visual Map →</span>
+                      </button>
+                    )}
+
+                    {/* Search Encyclopedia */}
+                    <div className="relative w-full sm:w-72 shrink-0">
+                      <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={encyclopediaSearchQuery}
+                        onChange={(e) => setEncyclopediaSearchQuery(e.target.value)}
+                        placeholder="Search tool definition, responsibility, CLI..."
+                        className="w-full pl-9 pr-7 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-purple-600"
+                      />
+                      {encyclopediaSearchQuery && (
+                        <button
+                          onClick={() => setEncyclopediaSearchQuery('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Category Filters */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                  <span className="text-xs font-semibold text-zinc-400 flex items-center gap-1 shrink-0 mr-1">
+                    <Filter className="w-3.5 h-3.5" /> Category:
+                  </span>
+                  {[
+                    { id: 'ALL', label: 'All Categories' },
+                    { id: 'LLM & Reasoning', label: 'LLM & Reasoning' },
+                    { id: 'Agent Framework', label: 'Agent Framework' },
+                    { id: 'Vector & Data', label: 'Vector & Data' },
+                    { id: 'Developer & IDE', label: 'Developer & IDE' },
+                    { id: 'Computer Vision & Multimodal', label: 'Computer Vision & Multimodal' },
+                    { id: 'Observability & Eval', label: 'Observability & Eval' }
+                  ].map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setEncyclopediaCategoryFilter(cat.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0 border ${
+                        encyclopediaCategoryFilter === cat.id
+                          ? 'bg-purple-950 text-purple-200 border-purple-600 shadow-md shadow-purple-950/50'
+                          : 'bg-zinc-900/80 text-zinc-400 hover:text-white border-zinc-800 hover:border-zinc-700'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Grid of Encyclopedia Tool Cards */}
+                {filteredEncyclopediaTools.length === 0 ? (
+                  <div className="p-12 text-center bg-zinc-900/40 rounded-2xl border border-zinc-800 space-y-3">
+                    <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto" />
+                    <p className="text-sm font-semibold text-zinc-300">No AI tools match your query</p>
+                    <p className="text-xs text-zinc-500">Try searching for generic terms like &quot;agent&quot;, &quot;vector&quot;, &quot;vision&quot;, &quot;streaming&quot;, or reset filters.</p>
+                    <button
+                      onClick={() => { setEncyclopediaCategoryFilter('ALL'); setEncyclopediaSearchQuery(''); }}
+                      className="px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs rounded-lg font-medium transition-all"
+                    >
+                      Reset Tool Filters
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    {filteredEncyclopediaTools.map((tool, idx) => (
+                      <div key={idx} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4 hover:border-zinc-700 transition-all flex flex-col justify-between">
+                        <div className="space-y-3.5">
+                          {/* Top Bar */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 pb-3">
+                            <div>
+                              <h4 className="text-base font-bold text-white tracking-tight">{tool.name}</h4>
+                            </div>
+                            <span className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full border ${
+                              tool.category === 'LLM & Reasoning'
+                                ? 'bg-purple-950 text-purple-300 border-purple-800'
+                                : tool.category === 'Agent Framework'
+                                ? 'bg-indigo-950 text-indigo-300 border-indigo-800'
+                                : tool.category === 'Vector & Data'
+                                ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
+                                : tool.category === 'Computer Vision & Multimodal'
+                                ? 'bg-amber-950 text-amber-300 border-amber-800'
+                                : tool.category === 'Observability & Eval'
+                                ? 'bg-rose-950 text-rose-300 border-rose-800'
+                                : 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                            }`}>
+                              {tool.category}
+                            </span>
+                          </div>
+
+                          {/* Definition Card */}
+                          <div className="p-3 bg-purple-950/20 border border-purple-900/40 rounded-xl space-y-1">
+                            <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold text-purple-300">
+                              <BookOpen className="w-3.5 h-3.5 text-purple-400" />
+                              <span>AI Tool Definition & Architecture:</span>
+                            </div>
+                            <p className="text-xs text-purple-200/90 leading-relaxed font-normal">
+                              {tool.definition}
+                            </p>
+                          </div>
+
+                          {/* Core FDE Responsibilities */}
+                          <div className="p-3 bg-emerald-950/20 border border-emerald-900/40 rounded-xl space-y-1.5">
+                            <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold text-emerald-300">
+                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>FDE Production Responsibilities & Invariants:</span>
+                            </div>
+                            <ul className="space-y-1 text-xs text-zinc-300">
+                              {tool.coreResponsibilities.map((resp, rIdx) => (
+                                <li key={rIdx} className="flex items-start gap-1.5 leading-relaxed">
+                                  <span className="text-emerald-400 font-bold shrink-0">•</span>
+                                  <span>{resp}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+
+                          {/* Architecture Spec */}
+                          <div className="p-2.5 bg-zinc-950/80 border border-zinc-800/80 rounded-xl text-xs font-mono text-zinc-300 flex items-start gap-2">
+                            <Cpu className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-zinc-400 block mb-0.5">Execution Architecture:</span>
+                              <span className="text-zinc-300">{tool.keyArchitecture}</span>
+                            </div>
+                          </div>
+
+                          {/* Setup Command */}
+                          {tool.setupCommand && (
+                            <div className="flex items-center justify-between p-2 bg-black/80 rounded-lg font-mono text-[11px] text-zinc-400 border border-zinc-800">
+                              <div className="flex items-center gap-2 overflow-hidden">
+                                <Terminal className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                <code className="truncate text-amber-300">{tool.setupCommand}</code>
+                              </div>
+                              <button
+                                onClick={() => handleCopyCode(tool.setupCommand!, `encyclopedia-cmd-${idx}`)}
+                                className="text-zinc-500 hover:text-white shrink-0 p-1 rounded hover:bg-zinc-800 ml-2"
+                                title="Copy command"
+                              >
+                                {copiedCodeId === `encyclopedia-cmd-${idx}` ? (
+                                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Footer: Primary Use Cases & Case Study Links */}
+                        <div className="pt-3 border-t border-zinc-800/80 space-y-2 mt-2">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-[10px] uppercase font-bold text-zinc-500 mr-1">Use Cases:</span>
+                            {tool.primaryUseCases.map((uc, uIdx) => (
+                              <span key={uIdx} className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">
+                                {uc}
+                              </span>
+                            ))}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                            <span className="text-[10px] uppercase font-bold text-zinc-500 mr-1">Deployed In:</span>
+                            {tool.deployedInCaseStudies.map((csTitle, cIdx) => (
+                              <button
+                                key={cIdx}
+                                onClick={() => {
+                                  setCasesSubView('cases');
+                                  setCaseStudySearchQuery(csTitle.split(':')[0] || csTitle.split(' ')[0]);
+                                }}
+                                className="text-[10px] px-2 py-0.5 rounded bg-purple-950/50 hover:bg-purple-900/60 text-purple-300 border border-purple-800/60 flex items-center gap-1 transition-all"
+                                title={`Jump to case study: ${csTitle}`}
+                              >
+                                <span className="truncate max-w-[200px]">{csTitle}</span>
+                                <ArrowRight className="w-2.5 h-2.5" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

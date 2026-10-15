@@ -366,3 +366,5 @@ public static void ConfigureObservability(IServiceCollection services, IConfigur
     ]
   }
 ];
+
+export * from './aiToolingEcosystemData';
